@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
 
-pragma solidity ^0.8.2;
+pragma solidity ^0.8.18;
 
-contract UserManagement {
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract UserManagement is Ownable {
     enum UserRole {
         None,
         User,
