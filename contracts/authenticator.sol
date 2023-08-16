@@ -3,7 +3,7 @@
 /**@dev @audit - '^' is still a floating pragma, consider using a fixed version like '0.8.18'.
  * Only use floating pragmas when writing libraries or developer tools / contracts that need to support multiple compiler versions.
  */
-pragma solidity ^0.8.18;
+pragma solidity ^0.8.19;
 
 /**
  * @dev it is good practice to use named imports where you specify the actual content you want to import.
@@ -14,6 +14,7 @@ pragma solidity ^0.8.18;
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract UserManagement is Ownable {
+
     enum UserRole {
         None,
         User,
@@ -44,7 +45,7 @@ contract UserManagement is Ownable {
      * @dev @audit - Acknowledged change of mapping keys.
      */
     mapping(address => User) public users;
-    mapping(address => bool) public usernameExists; ///@dev @audit - Either use the bytes32 of the email as key or completely remove this mapping and utilize the users mapping instead.
+    //mapping(address => bool) public usernameExists; ///@dev @audit - Either use the bytes32 of the email as key or completely remove this mapping and utilize the users mapping instead.
     mapping(bytes32 => bool) public emailExists;
 
     event UserSignedUp(
@@ -54,14 +55,6 @@ contract UserManagement is Ownable {
         UserRole role
     );
     event UserRoleUpdated(address indexed userAddress, UserRole role);
-
-    modifier onlyAdmin() {
-        require(
-            users[msg.sender].role == UserRole.Admin,
-            "Only admin can call this function"
-        );
-        _;
-    }
 
     /**
      * @dev @audit userExists modifier can be bypassed by users who sign up with an empty string as their username.
@@ -89,7 +82,8 @@ contract UserManagement is Ownable {
         bytes32 encryptedPassword
     ) external {
         /**@audit as noted on line 44, a different user can still use a username already used by another address */
-        require(!usernameExists[msg.sender], "Username already taken");
+        require(users[msg.sender].username == username, "Username already taken");
+        require(users[msg.sender].email == email, "Email already taken");
         require(!emailExists[email], "Email already registered");
 
         User memory newUser = User({
@@ -108,7 +102,7 @@ contract UserManagement is Ownable {
         ///@dev - This can be prevented by adding a check to to the users mapping to ensure the username and email are not already registered.
 
         users[msg.sender] = newUser;
-        usernameExists[msg.sender] = true;
+        //usernameExists[msg.sender] = true;
         emailExists[email] = true;
 
         emit UserSignedUp(msg.sender, username, email, UserRole.User);
@@ -143,7 +137,7 @@ contract UserManagement is Ownable {
     function updateUserRole(
         address _userAddress,
         UserRole _role
-    ) external onlyAdmin {
+    ) external onlyOwner {
         require(
             users[_userAddress].role != UserRole.None,
             "User does not exist"
