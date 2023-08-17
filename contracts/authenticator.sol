@@ -59,9 +59,9 @@ contract UserManagement is Ownable {
     /**
      * @dev @audit userExists modifier can be bypassed by users who sign up with an empty string as their username.
      */
-    modifier userExists() {
+    modifier userExists(address userAddress) {
         require(
-            bytes32(users[msg.sender].username).length > 0,
+            bytes32(users[userAddress].username).length > 0,
             "User does not exist"
         );
         _;
@@ -79,11 +79,12 @@ contract UserManagement is Ownable {
     function signUp(
         bytes32 username,
         bytes32 email,
-        bytes32 encryptedPassword
-    ) external {
+        bytes32 encryptedPassword,
+        address userAddress
+    ) external onlyOwner{
         /**@audit as noted on line 44, a different user can still use a username already used by another address */
-        require(users[msg.sender].username == username, "Username already taken");
-        require(users[msg.sender].email == email, "Email already taken");
+        require(users[userAddress].username == username, "Username already taken");
+        require(users[userAddress].email == email, "Email already taken");
         require(!emailExists[email], "Email already registered");
 
         User memory newUser = User({
@@ -101,29 +102,30 @@ contract UserManagement is Ownable {
         ///@audit It's still possible for a user to overwrite their own information by signing up with a different username and email.
         ///@dev - This can be prevented by adding a check to to the users mapping to ensure the username and email are not already registered.
 
-        users[msg.sender] = newUser;
+        users[userAddress] = newUser;
         //usernameExists[msg.sender] = true;
         emailExists[email] = true;
 
-        emit UserSignedUp(msg.sender, username, email, UserRole.User);
+        emit UserSignedUp(userAddress, username, email, UserRole.User);
     }
 
     function login(
         bytes32 _email,
-        bytes32 _encryptedPassword
-    ) external view returns (bytes32) {
+        bytes32 _encryptedPassword,
+        address userAddress
+    ) external onlyOwner view returns (bytes32) {
         require(emailExists[_email], "Email not registered");
-
+        require(users[userAddress].username == "", "User not registered");
         ///@audit gas optimization - Load the user into memory instead of storage since we are not modifying the user.
         ///@dev - This will save on gas costs as it is cheaper to work with memory than storage.
         ///@dev DONE
         ///@audit - Acknowledged fix.
 
-        User memory user = users[msg.sender];
+        User memory user = users[userAddress];
 
         ///@dev careful using encodePacked, it can lead to collisions. Be sure to use a salt or nonce to prevent possible collisions.
         require(
-            keccak256(abi.encodePacked(_encryptedPassword)) ==
+                _encryptedPassword ==
                 user.encryptedPassword,
             "Incorrect password"
         );
@@ -154,7 +156,7 @@ contract UserManagement is Ownable {
     /// @dev @audit - Acknowledged fix.
     function getUserRole(
         address userAddress
-    ) external view userExists returns (UserRole) {
+    ) external view userExists(userAddress) returns (UserRole) {
         return users[userAddress].role;
     }
 }

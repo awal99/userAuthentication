@@ -1,27 +1,26 @@
-import { ethers } from "hardhat";
+import "@nomiclabs/hardhat-ethers"
+import { ethers, network } from 'hardhat';
+import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 
 async function main() {
-  const currentTimestampInSeconds = Math.round(Date.now() / 1000);
-  const unlockTime = currentTimestampInSeconds + 60;
 
-  const lockedAmount = ethers.parseEther("0.001");
-
-  const lock = await ethers.deployContract("Lock", [unlockTime], {
-    value: lockedAmount,
-  });
-
-  await lock.waitForDeployment();
-
+  const [deployer] = await ethers.getSigners();
   console.log(
-    `Lock with ${ethers.formatEther(
-      lockedAmount
-    )}ETH and unlock timestamp ${unlockTime} deployed to ${lock.target}`
+  "Deploying contracts with the account:",
+  deployer.address
   );
+
+ //console.log("Account balance:", (await signer).toString());
+
+  const authenticator = await ethers.getContractFactory("UserManagement");
+  const contract = await authenticator.deploy();
+
+  console.log("Contract deployed at:", contract?.address);
 }
 
-// We recommend this pattern to be able to use async/await everywhere
-// and properly handle errors.
-main().catch((error) => {
+main()
+.then(() => process.exit(0))
+.catch(error => {
   console.error(error);
-  process.exitCode = 1;
+  process.exit(1);
 });
