@@ -21,7 +21,7 @@ function signUp(){
     console.log('Hashed Password:', hashedPassword);
 
     //store hashedpassword + signup data to block-chain
-
+    
 
     //return salt to user/thirdparty as public key
     //it depends on the user/thirdparty as to how to store salt as public key
