@@ -32,7 +32,7 @@ contract UserManagement is Ownable2Step {
 
     modifier userExists(address userAddress) {
         require(
-            bytes32(users[userAddress].username).length > 0,
+            (users[userAddress].username) != bytes32(0),
             "User does not exist"
         );
         _;
@@ -75,14 +75,8 @@ contract UserManagement is Ownable2Step {
     function login(
         bytes32 encryptedPassword,
         address userAddress
-    ) external view onlyOwner returns (bytes32) {
+    ) external view onlyOwner userExists(userAddress) returns (bytes32) {
         User memory user = users[userAddress];
-        require(
-            user.username != bytes32(0) &&
-                user.email != bytes32(0) &&
-                user.role != UserRole.None,
-            "User not registered"
-        );
 
         require(
             encryptedPassword == user.encryptedPassword,
@@ -93,22 +87,15 @@ contract UserManagement is Ownable2Step {
     }
 
     function updateUserRole(
-        address _userAddress,
-        UserRole _role
-    ) external onlyOwner {
-        require(
-            users[_userAddress].role != UserRole.None,
-            "User does not exist"
-        );
+        address userAddress,
+        UserRole role
+    ) external onlyOwner userExists(userAddress) {
+        users[userAddress].role = role;
 
-        users[_userAddress].role = _role;
-
-        emit UserRoleUpdated(_userAddress, _role);
+        emit UserRoleUpdated(userAddress, role);
     }
 
-    function getUserRole(
-        address userAddress
-    ) external view userExists(userAddress) returns (UserRole) {
+    function getUserRole(address userAddress) external view returns (UserRole) {
         return users[userAddress].role;
     }
 }
