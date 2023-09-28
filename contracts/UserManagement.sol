@@ -41,15 +41,16 @@ contract UserManagement is Ownable2Step {
     function signUp(
         bytes32 username,
         bytes32 email,
-        bytes32 encryptedPassword
-    ) external {
+        bytes32 encryptedPassword,
+        address userAddress
+    ) external onlyOwner {
         require(
-            users[msg.sender].username.length == 0 &&
-                users[msg.sender].email.length == 0,
+            users[userAddress].username.length == 0 &&
+                users[userAddress].email.length == 0,
             "user already registered"
         );
         require(!emailExists[email], "Email already registered");
-        require(!userNameExists[msg.sender], "username unavailable");
+        require(!userNameExists[userAddress], "username unavailable");
 
         User memory newUser = User({
             username: username,
@@ -58,24 +59,25 @@ contract UserManagement is Ownable2Step {
             role: UserRole.User
         });
 
-        users[msg.sender] = newUser;
+        users[userAddress] = newUser;
         emailExists[email] = true;
-        userNameExists[msg.sender] = true;
+        userNameExists[userAddress] = true;
 
-        emit UserSignedUp(msg.sender, username, email, UserRole.User);
+        emit UserSignedUp(userAddress, username, email, UserRole.User);
     }
 
     function login(
-        bytes32 _email,
-        bytes32 _encryptedPassword
-    ) external view returns (bytes32) {
-        require(emailExists[_email], "Email not registered");
-        require(users[msg.sender].username.length != 0, "User not registered");
+        bytes32 email,
+        bytes32 encryptedPassword,
+        address userAddress
+    ) external view onlyOwner returns (bytes32) {
+        require(emailExists[email], "Email not registered");
+        require(users[userAddress].username.length != 0, "User not registered");
 
-        User memory user = users[msg.sender];
+        User memory user = users[userAddress];
 
         require(
-            _encryptedPassword == user.encryptedPassword,
+            encryptedPassword == user.encryptedPassword,
             "Incorrect password"
         );
 
