@@ -19,7 +19,7 @@ contract UserManagement is Ownable2Step {
     }
 
     mapping(address user => User userStruct) public users;
-    mapping(address user => bool used) userNameExists;
+    mapping(bytes32 username => bool used) userNameExists;
     mapping(bytes32 email => bool used) public emailExists;
 
     event UserSignedUp(
@@ -45,12 +45,18 @@ contract UserManagement is Ownable2Step {
         address userAddress
     ) external onlyOwner {
         require(
-            users[userAddress].username.length == 0 &&
-                users[userAddress].email.length == 0,
+            users[userAddress].username == bytes32(0) &&
+                users[userAddress].email == bytes32(0),
             "user already registered"
         );
         require(!emailExists[email], "Email already registered");
-        require(!userNameExists[userAddress], "username unavailable");
+        require(!userNameExists[username], "username unavailable");
+        require(
+            username != bytes32(0) ||
+                email != bytes32(0) ||
+                encryptedPassword != bytes32(0),
+            "Invalid input"
+        );
 
         User memory newUser = User({
             username: username,
@@ -61,20 +67,22 @@ contract UserManagement is Ownable2Step {
 
         users[userAddress] = newUser;
         emailExists[email] = true;
-        userNameExists[userAddress] = true;
+        userNameExists[username] = true;
 
         emit UserSignedUp(userAddress, username, email, UserRole.User);
     }
 
     function login(
-        bytes32 email,
         bytes32 encryptedPassword,
         address userAddress
     ) external view onlyOwner returns (bytes32) {
-        require(emailExists[email], "Email not registered");
-        require(users[userAddress].username.length != 0, "User not registered");
-
         User memory user = users[userAddress];
+        require(
+            user.username != bytes32(0) &&
+                user.email != bytes32(0) &&
+                user.role != UserRole.None,
+            "User not registered"
+        );
 
         require(
             encryptedPassword == user.encryptedPassword,
