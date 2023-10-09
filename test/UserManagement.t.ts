@@ -1,8 +1,10 @@
 import { expect } from 'chai';
 import { ethers } from 'hardhat';
 import {loadFixture} from "@nomicfoundation/hardhat-toolbox/network-helpers";
+import { generateSalt,sha256WithSalt } from '../scripts/controllers/encrypt';
 
 describe('UserManagement', async () => {
+    let salts:any= {alice:'',bob:''}
 
     async function deployment() {        
         const [admin, alice, bob] = await ethers.getSigners();
@@ -13,16 +15,28 @@ describe('UserManagement', async () => {
     }
 
     function prepareSignUpData(email: string, username: string, password: string) {
-        const passwordBytes = ethers.encodeBytes32String(password)
+       
         const emailBytes = ethers.encodeBytes32String(email)
         const usernameBytes = ethers.encodeBytes32String(username)
-        const hashedPassword = ethers.keccak256(passwordBytes)
 
-        return {emailBytes, usernameBytes, hashedPassword}
+        let salt=''
+        if(salts[`${username}`]==''){
+             salt = generateSalt()
+             salts[`${username}`]=salt
+        }else{
+             salt = salts[`${username}`]
+        }
+
+        const hashedPassword = ethers.solidityPackedKeccak256(["bytes32","bytes32"],[ethers.encodeBytes32String(password),ethers.encodeBytes32String(salt)])
+        //const hashedPassword =  ethers.keccak256(passwordBytes)
+
+        return {emailBytes, usernameBytes, hashedPassword, salt}
     }
 
-    function prepareLoginData(password: string) {
-        return ethers.keccak256(ethers.encodeBytes32String(password))
+    function prepareLoginData(password: string, username:string) {
+        const hashedPassword = ethers.solidityPackedKeccak256(["bytes32","bytes32"],[ethers.encodeBytes32String(password),ethers.encodeBytes32String(salts[`${username}`])])
+        //const hashedPassword =  ethers.keccak256(passwordBytes)
+        return hashedPassword
     }
 
     describe('Deployment', () => {
@@ -38,7 +52,8 @@ describe('UserManagement', async () => {
         it('should not signup a user if caller not admin', async () => {
             const { userManagement, alice } = await loadFixture(deployment);
 
-            const { emailBytes, usernameBytes, hashedPassword } = prepareSignUpData('alice@example.com', 'alice', 'AlicePasswd2000')
+            const { emailBytes, usernameBytes, hashedPassword, salt } = prepareSignUpData('alice@example.com', 'alice', 'AlicePasswd2000')
+            console.log("Alice's salt:",salt)
             ///@notice alice tries to send the transaction, not owner.
             await expect(userManagement.connect(alice).signUp(usernameBytes, emailBytes, hashedPassword, alice.address)).to.be.revertedWith('Ownable: caller is not the owner')
         })
@@ -51,7 +66,7 @@ describe('UserManagement', async () => {
 
         it('should not sign up a user more than once', async () => {
             const { userManagement, alice } = await loadFixture(deployment);
-            const { emailBytes, usernameBytes, hashedPassword } = prepareSignUpData('alice@example.com', 'alice', 'AlicePasswd2000')
+            const { emailBytes, usernameBytes, hashedPassword, salt } = prepareSignUpData('alice@example.com', 'alice', 'AlicePasswd2000')
             await userManagement.signUp(usernameBytes, emailBytes, hashedPassword, alice.address) ///@notice first sign up
 
             const { emailBytes: emailBytes2, usernameBytes: usernameBytes2, hashedPassword: hashedPassword2 } = prepareSignUpData('sample2@example.com', 'alice_2', 'AlicePasswd2002')
@@ -89,7 +104,7 @@ describe('UserManagement', async () => {
             expect(aliceDetails.encryptedPassword).to.equal(hashedPassword, 'Alice password hash mismatch')
             expect(aliceDetails.role).to.equal(1n, 'Alice role should be user(1)');
          
-            const { emailBytes: emailBytes2, usernameBytes: usernameBytes2, hashedPassword: hashedPassword2 } = prepareSignUpData('bob@example.com', 'bob', 'BobPasswd2002')
+            const { emailBytes: emailBytes2, usernameBytes: usernameBytes2, hashedPassword: hashedPassword2, salt } = prepareSignUpData('bob@example.com', 'bob', 'BobPasswd2002')
             await userManagement.signUp(usernameBytes2, emailBytes2, hashedPassword2, bob.address) ///@notice Bob's sign up
 
             const bobDetails = await userManagement.users(alice.address)
@@ -103,14 +118,14 @@ describe('UserManagement', async () => {
     describe('Login', () => {
         it('should not login if user has not signed up', async () => {
             const { userManagement, alice } = await loadFixture(deployment);
-            const hashedPassword = prepareLoginData('AlicePasswd2000')
+            const hashedPassword = prepareLoginData('AlicePasswd2000', 'alice')
 
             await expect(userManagement.login(hashedPassword, alice.address)).to.be.rejectedWith('User does not exist')
         })
 
         it('should not login if caller not admin', async () => {
             const { userManagement, alice } = await loadFixture(deployment);
-            const hashedPassword = prepareLoginData('AlicePasswd2000')
+            const hashedPassword = prepareLoginData('AlicePasswd2000', 'alice')
             ///@notice alice is trying to make the contract call
             await expect(userManagement.connect(alice).login(hashedPassword, alice.address)).to.be.rejectedWith('Ownable: caller is not the owner')
         })
@@ -120,7 +135,7 @@ describe('UserManagement', async () => {
             const { emailBytes, usernameBytes, hashedPassword } = prepareSignUpData('alice@example.com', 'alice', 'AlicePasswd2000')
             await userManagement.signUp(usernameBytes, emailBytes, hashedPassword, alice.address) ///@notice alice signed up
 
-            const wrongPassword = prepareLoginData('AlicePasswd2000 ') ///@notice whitespace in password
+            const wrongPassword = prepareLoginData('AlicePasswd2000 d', 'alice') ///@notice whitespace in password
 
             await expect(userManagement.login(wrongPassword, alice.address)).to.be.rejectedWith('Incorrect password')
         })
